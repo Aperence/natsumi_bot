@@ -7,7 +7,7 @@ const { token } = require('./config.json');
 // Create a new client instance
 const client = new Client({
     partials: ['MESSAGE', 'CHANNEL', 'REACTION'],
-    intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES]
+    intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MESSAGE_REACTIONS]
 });
 
 client.commands = new Collection();
@@ -23,55 +23,20 @@ for (const file of commandFiles) {
 }
 
 
+client.events = new Collection();
+const eventsPath = path.join(__dirname, 'events');
+const eventsFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
-// When the client is ready, run this code (only once)
-client.once('ready', () => {
-	console.log('Ready!');
-});
-
-client.on('interactionCreate', async interaction => {
-
-	if (!interaction.isCommand() && !interaction.isSelectMenu()) return;
-
-	const command = client.commands.get(interaction.commandName) || client.commands.get(interaction.customId);
-
-	if (!command) return;
-
-	if (interaction.isSelectMenu()){
-		try {
-			await command.handleSelection(interaction, client)
-		} catch (error) {
-			console.error(error);
-			await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
-		}
-		return
+for (const file of eventsFiles) {
+	const filePath = path.join(eventsPath, file);
+	const event = require(filePath);
+	
+	if (event.once){
+		client.once(event.eventName,(...args) => event.react(client, ...args))
+	}else{
+		client.on(event.eventName,(...args) => event.react(client, ...args))
 	}
-
-	try {
-		await command.execute(interaction, client);
-	} catch (error) {
-		console.error(error);
-		await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
-	}
-});
-
-
-client.on("messageCreate", async function(message) {
-    if(message.author.bot) return;
-	if (message.content == ".delete"){
-		message.channel.messages.fetch({
-			limit: 100
-		}).then((messages)=>{
-			var botMessages = messages.filter((msg) => msg.author.id === "979004851168096316")
-			message.channel.bulkDelete(botMessages, true).then(()=>{
-				message.delete()
-				message.channel.send("Cleared bot messages").then(msg => setTimeout(()=>msg.delete(), 5000))
-			})
-		})
-		return
-	}
-	await message.delete()
-});
+}
 
 
 
